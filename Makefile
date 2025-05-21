@@ -133,6 +133,9 @@ test-profiles-command:
 test-check-update-version:
 	./scripts/test-check-update-version.sh
 
+test-llm-write-docs:
+	cd test/packages/sample_package_docs_only && ../../../elastic-package llm-write-docs
+
 test: test-go test-stack-command test-check-packages test-profiles-command test-build-install-zip test-build-zip test-build-install-zip-file test-build-install-zip-file-shellinit test-check-update-version test-profiles-command test-system-test-flags
 
 check-git-clean:

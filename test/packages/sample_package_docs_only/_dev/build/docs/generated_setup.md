@@ -1,0 +1,3 @@
+To set up the Bitwarden integration, you need to configure your Bitwarden instance to forward logs to Elastic. Refer to the Bitwarden documentation (https://bitwarden.com/help/article/audit-logs/) for instructions on enabling and configuring audit logging. Once audit logging is enabled, you can configure Bitwarden to send the logs to Elastic using a supported log shipping mechanism, such as Filebeat or Logstash. The Bitwarden documentation provides guidance on the log format and available log fields.
+
+<!-- Generated on: 2025-05-21T17:06:01-04:00 -->
