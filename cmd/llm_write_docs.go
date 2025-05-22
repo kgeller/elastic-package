@@ -151,9 +151,10 @@ func generateContentWithBedrock() (Response, error) {
 
 	prompt := 
 	`You're an expert documentation writer for Elastic integrations. You are creating a new 
-	integration for bitwarden with a datastream for logs. Can you reference the documentation 
-	and write me the following 1) an overview and 2) setup instructions for the readme following 
-	elastic writing guidelines. 
+	integration for bitwarden with a datastream for events. This datastream will contain only one
+	input type for CEL for reading from the HTTP API. Can you write the following pieces of 
+	elastic integrations documentation: 1) an overview and 2) explicit setup instructions per 
+	the following elastic writing guidelines. 
 	Guidelines: 
 	Overview: The overview section explains what the integration is, defines the third-party 
 	product that is providing data, establishes its relationship to the larger ecosystem of 
@@ -165,12 +166,13 @@ func generateContentWithBedrock() (Response, error) {
 	* General description 
 	* Basic example 
 	Setup: 
-	This section should include only setup instructions on the vendor side. For example, for 
-	the Cisco ASA integration, users need to configure their Cisco device following the steps 
-	found in the Cisco documentation. Note When possible, use links to point to third-party 
-	documentation for configuring non-Elastic products since workflows may change without notice. 
+	The setup section should include thorough configuration instructions for how to setup the 
+	necessary pieces on the vendor side. These instructions should be explicit and read as detailed
+	steps like a recipe. Be sure to include supporting links to point to the vendor third-party 
+	documentation. For integrations with an API, be sure to include where to find any API keys
+	or keys and secrets. Do not ever include any instructions for configuration related to 
+	Elastic or Elastic products as those will be covered in another step. 
 
-	Remove markdown formatting from the response. Do not include any newlines in the response. 
 	Please return the response in one line JSON format so that overview and setup instructions 
 	are separate keys.`
 
@@ -184,7 +186,7 @@ func generateContentWithBedrock() (Response, error) {
 				},
 			},
 		},
-		llms.WithMaxTokens(512),
+		llms.WithMaxTokens(1000),
 		llms.WithTemperature(0.1),
 		llms.WithTopP(1.0),
 		llms.WithTopK(100),
