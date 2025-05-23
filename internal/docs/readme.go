@@ -204,6 +204,12 @@ func renderReadme(fileName, packageRoot, templatePath string, linksMap linkMap) 
 			}
 			return linksMap.RenderLink(args[0], options)
 		},
+		"section": func(args ...string) (string, error) {
+			if len(args) > 0 {
+				return renderGeneratedSection(packageRoot, args[0])
+			}
+			return "", errors.New("section name not provided")
+		},
 	}).ParseFiles(templatePath)
 	if err != nil {
 		return nil, fmt.Errorf("parsing README template failed (path: %s): %w", templatePath, err)
