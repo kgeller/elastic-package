@@ -5,45 +5,18 @@
 package cmd
 
 import (
-	"context"
 	_ "embed"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/elastic/elastic-package/internal/cobraext"
 	"github.com/elastic/elastic-package/internal/packages"
-
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime"
-	"github.com/aws/aws-sdk-go-v2/service/sts"
-	"github.com/tmc/langchaingo/llms"
-	"github.com/tmc/langchaingo/llms/bedrock"
+	"github.com/elastic/elastic-package/internal/packages/archetype"
 )
 
-const AWS_REGION = "us-east-1"
-const BEDROCK_MODEL_ID = "anthropic.claude-3-5-sonnet-20240620-v1:0"
 
-type BedrockLLM struct {
-	client     *bedrockruntime.Client
-	modelID    string
-	contentKey string
-}
-
-type Prompt struct {
-	Prompt string `json:"prompt"`
-}
-
-type Response struct {
-	Overview string `json:"overview"`
-	Setup    string `json:"setup"`
-}
 
 const llmWriteDocsLongDescription = `Use this command to write documentation for the package using LLM.
 The LLM write docs command generates documentation for the package using a large language model (LLM). 
@@ -78,133 +51,20 @@ func llmWriteDocsCommandAction(cmd *cobra.Command, args []string) error {
 		return errors.New("package root not found, you can only author documentation in the package context")
 	}
 
-	llmResponse, err := generateContentWithBedrock()
+	manifest , err := archetype.GetManifest(pkgRootDir)
+	if err != nil {
+		return fmt.Errorf("failed to get package manifest: %w", err)
+	}
+
+	llmResponse, err := archetype.GenerateContentWithBedrock(manifest.Name)
 	if err != nil {
 		return fmt.Errorf("failed to generate documentation content from LLM: %w", err)
 	}
 
-	if err := writeDocumentationFiles(pkgRootDir, llmResponse, cmd); err != nil {
+	if err := archetype.WriteDocumentationFiles(pkgRootDir, llmResponse); err != nil {
 		return err
 	}
 
 	cmd.Println("Done")
 	return nil
-}
-
-func writeDocumentationFiles(pkgRootDir string, llmResponse Response, cmd *cobra.Command) error {
-	// Define path and create directories for documentation files
-	outputFileDir := filepath.Join(pkgRootDir, "_dev", "build", "docs")
-	if err := os.MkdirAll(outputFileDir, 0755); err != nil {
-		return fmt.Errorf("failed to create directory %s: %w", outputFileDir, err)
-	}
-
-	timestampComment := fmt.Sprintf("\n\n<!-- Generated on: %s -->", time.Now().Format(time.RFC3339))
-
-	// Replace literal \\n with actual newlines for proper markdown rendering
-	processedOverview := strings.ReplaceAll(llmResponse.Overview, "\\n", "\n")
-	overviewContent := processedOverview + timestampComment
-	processedSetup := strings.ReplaceAll(llmResponse.Setup, "\\n", "\n")
-	setupContent := processedSetup + timestampComment
-
-	overviewFilePath := filepath.Join(outputFileDir, "generated_overview.md")
-	if err := os.WriteFile(overviewFilePath, []byte(overviewContent), 0644); err != nil {
-		return fmt.Errorf("failed to write overview to %s: %w", overviewFilePath, err)
-	}
-	cmd.Printf("Overview successfully written to %s\n", overviewFilePath)
-	
-	setupFilePath := filepath.Join(outputFileDir, "generated_setup.md")
-	if err := os.WriteFile(setupFilePath, []byte(setupContent), 0644); err != nil {
-		return fmt.Errorf("failed to write setup to %s: %w", setupFilePath, err)
-	}
-	cmd.Printf("Setup successfully written to %s\n", setupFilePath)
-
-	return nil
-}
-
-func generateContentWithBedrock() (Response, error) {
-	ctx := context.TODO()
-
-	cfg, err := config.LoadDefaultConfig(ctx,
-		config.WithSharedConfigProfile("elastic-siem"), config.WithRegion(AWS_REGION),
-	)
-	if err != nil {
-		return Response{}, fmt.Errorf("unable to load SDK config: %w", err)
-	}
-
-	stsClient := sts.NewFromConfig(cfg)
-	out, err := stsClient.GetCallerIdentity(context.TODO(), &sts.GetCallerIdentityInput{})
-	if err != nil {
-		return Response{}, fmt.Errorf("failed to get caller identity: %w", err)
-	}
-
-	fmt.Printf("Logged in as: %s\n", *out.Arn)
-
-	bedrockSvcClient := bedrockruntime.NewFromConfig(cfg)
-
-	llm, err := bedrock.New(
-		bedrock.WithModel(bedrock.ModelAnthropicClaudeV3Sonnet),
-		bedrock.WithClient(bedrockSvcClient),
-	)
-	if err != nil {
-		return Response{}, fmt.Errorf("failed to initialize Bedrock LLM: %w", err)
-	}
-
-	prompt := 
-	`You're an expert documentation writer for Elastic integrations. You are creating a new 
-	integration for bitwarden with a datastream for events. This datastream will contain only one
-	input type for CEL for reading from the HTTP API. Can you write the following pieces of 
-	elastic integrations documentation: 1) an overview and 2) explicit setup instructions per 
-	the following elastic writing guidelines. 
-	Guidelines: 
-	Overview: The overview section explains what the integration is, defines the third-party 
-	product that is providing data, establishes its relationship to the larger ecosystem of 
-	Elastic products, and helps the reader understand how it can be used to solve a tangible 
-	problem. The overview should answer the following questions: 
-	* What is the integration? 
-	* What is the third-party product that is providing data? 
-	* What can you do with it? 
-	* General description 
-	* Basic example 
-	Setup: 
-	The setup section should include thorough configuration instructions for how to setup the 
-	necessary pieces on the vendor side. These instructions should be explicit and read as detailed
-	steps like a recipe. Be sure to include supporting links to point to the vendor third-party 
-	documentation. For integrations with an API, be sure to include where to find any API keys
-	or keys and secrets. Do not ever include any instructions for configuration related to 
-	Elastic or Elastic products as those will be covered in another step. 
-
-	Please return the response in one line JSON format so that overview and setup instructions 
-	are separate keys.`
-
-	resp, err := llm.GenerateContent(
-		ctx,
-		[]llms.MessageContent{
-			{
-				Role: llms.ChatMessageTypeHuman,
-				Parts: []llms.ContentPart{
-					llms.TextPart(prompt),
-				},
-			},
-		},
-		llms.WithMaxTokens(1000),
-		llms.WithTemperature(0.1),
-		llms.WithTopP(1.0),
-		llms.WithTopK(100),
-	)
-	if err != nil {
-		return Response{}, fmt.Errorf("failed to generate content: %w", err)
-	}
-
-	choices := resp.Choices
-	if len(choices) < 1 {
-		return Response{}, errors.New("empty response from model")
-	}
-
-	var llmResp Response
-	err = json.Unmarshal([]byte(choices[0].Content), &llmResp)
-	if err != nil {
-		return Response{}, fmt.Errorf("failed to unmarshal LLM response: %w. Content: %s", err, choices[0].Content)
-	}
-
-	return llmResp, nil
 }
