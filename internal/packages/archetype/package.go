@@ -22,6 +22,8 @@ type PackageDescriptor struct {
 	InputDataStreamType string
 
 	ExcludeChecks []string
+
+	UseLLMGenerateDocs bool
 }
 
 // CreatePackage function bootstraps the new package based on the provided descriptor.
@@ -99,6 +101,23 @@ func createPackageInDir(packageDescriptor PackageDescriptor, cwd string) error {
 		err = renderResourceFile(validationBaseTemplate, &packageDescriptor, filepath.Join(baseDir, "validation.yml"))
 		if err != nil {
 			return fmt.Errorf("can't render validation file")
+		}
+	}
+
+	if packageDescriptor.UseLLMGenerateDocs {
+		logger.Debugf("Write LLM generated docs")
+			err = renderResourceFile(packageDocsReadme, &packageDescriptor, filepath.Join(baseDir, "_dev", "build", "docs", "README.md"))
+			if err != nil {
+				return fmt.Errorf("can't render package README: %w", err)
+			}
+
+		llmResponse, err := GenerateContentWithBedrock(packageDescriptor.Manifest.Name)
+		if err != nil {
+			return fmt.Errorf("failed to generate documentation content from LLM: %w", err)
+		}
+
+		if err := WriteDocumentationFiles(baseDir, llmResponse); err != nil {
+			return err
 		}
 	}
 

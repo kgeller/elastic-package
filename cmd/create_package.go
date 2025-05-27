@@ -38,6 +38,7 @@ type newPackageAnswers struct {
 	GithubOwner         string `survey:"github_owner"`
 	OwnerType           string `survey:"owner_type"`
 	DataStreamType      string `survey:"datastream_type"`
+	UseLLMDocs 			bool `survey:"llm_generated_docs"`
 	Subobjects          bool
 }
 
@@ -172,6 +173,15 @@ func createPackageCommandAction(cmd *cobra.Command, args []string) error {
 			},
 			Validate: survey.Required,
 		},
+		{
+			Name: "llm_generated_docs",
+			Prompt: &survey.Confirm{
+				Message: "Use LLM to generate docs?",
+				Default: false,
+				
+			},
+			Validate: survey.Required,
+		},
 	}
 
 	if answers.Type == "input" {
@@ -266,6 +276,7 @@ func createPackageDescriptorFromAnswers(answers newPackageAnswers) archetype.Pac
 			Categories:    answers.Categories,
 			Elasticsearch: elasticsearch,
 		},
+		UseLLMGenerateDocs: answers.UseLLMDocs,
 		InputDataStreamType: inputDataStreamType,
 	}
 }

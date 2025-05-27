@@ -208,7 +208,7 @@ func renderReadme(fileName, packageRoot, templatePath string, linksMap linkMap) 
 			if len(args) > 0 {
 				return renderGeneratedSection(packageRoot, args[0])
 			}
-			return "", errors.New("section name not provided")
+			return "", nil
 		},
 	}).ParseFiles(templatePath)
 	if err != nil {
